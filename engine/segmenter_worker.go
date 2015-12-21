@@ -17,7 +17,7 @@ func (engine *Engine) segmenterWorker() {
 
 		tokensMap := make(map[string][]int)
 		numTokens := 0
-		if request.data.Content != "" {
+		if !engine.initOptions.NotUsingSegmenter && request.data.Content != "" {
 			// 当文档正文不为空时，优先从内容分词中得到关键词
 			segments := engine.segmenter.Segment([]byte(request.data.Content))
 			for _, segment := range segments {
@@ -39,7 +39,11 @@ func (engine *Engine) segmenterWorker() {
 
 		// 加入非分词的文档标签
 		for _, label := range request.data.Labels {
-			if !engine.stopTokens.IsStopToken(label) {
+			if !engine.initOptions.NotUsingSegmenter {
+				if !engine.stopTokens.IsStopToken(label) {
+					tokensMap[label] = []int{}
+				}
+			} else {
 				tokensMap[label] = []int{}
 			}
 		}
@@ -61,8 +65,8 @@ func (engine *Engine) segmenterWorker() {
 			iTokens++
 		}
 		engine.indexerAddDocumentChannels[shard] <- indexerRequest
-		rankerRequest := rankerAddScoringFieldsRequest{
+		rankerRequest := rankerAddDocRequest{
 			docId: request.docId, fields: request.data.Fields}
-		engine.rankerAddScoringFieldsChannels[shard] <- rankerRequest
+		engine.rankerAddDocChannels[shard] <- rankerRequest
 	}
 }
